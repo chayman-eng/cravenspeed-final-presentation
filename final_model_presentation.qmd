@@ -1,0 +1,120 @@
+---
+title: "Profit Prediction: Linear Regression Model"
+author: "Cameron, Endy, Ghson, Ted"
+format: revealjs
+editor: visual
+---
+
+## Goal
+
+- Build the CravenSpeed profit prediction model using **Linear Regression (lm)**
+- Use newly engineered features that capture cost, complexity, and pricing interactions to predict profit
+- Target: `Profit = Revenue-(Units Sold × BOM Cost)`
+- Evaluate model using **cross-validated** RMSE and Adjusted R²
+
+## Dataset
+
+- Dataset: `craven_train.rds` with 1468 cleaned product records (from an original 2439 before filtering)
+- Contains product specs data: weight, components, material, price, etc
+
+## Engineer() Function Overview
+
+- The `engineer()` function filters data and applies transformations to extract high-signal features
+- All features are numeric and clean
+- Missing values dropped
+- Target `Profit` is calculated internally
+- Feature count = 10 + target
+
+## Data Cleaning Justification
+
+- Over 900 rows were filtered out using `engineer()` due to:
+  - Zero or missing `Units Sold` and `Revenue`
+  - NAs in key numerical columns used in features
+- This filtering produced a clean training set of 1468 rows
+- Result: Highly stable feature engineering and cross-validation
+- Outcome: Dramatic RMSE drop from \~980 → **387**
+
+## Engineered Features
+
+- **`true_profit_margin`**: (`Revenue - Cost`) / `Revenue` — normalized profitability signal
+- **`log_units_sold`**: Log-transformed units sold — smooths skew and reduces outlier impact
+- **`retail_bom_ratio`**: Retail price / BOM cost — margin proxy
+- **`revenue_per_component`**: Revenue per product complexity
+- **`log_units_components`**: Scaled complexity: log-units × component count
+
+## Engineered Features Cont.
+- **`bom_weight_interaction`**: Physical cost pressure — BOM × weight
+- **`material_numeric`**: Encoded material type
+- **`price_weight_interaction`**: Premium perception — price × weight
+- **`revenue_per_unit`**: Implied average price
+- **`component_cost_ratio`**: Cost efficiency indicator — BOM cost per component
+
+## Cross-Validation Setup
+
+- Used `caret::train()` for consistent evaluation
+- Final model used **1465-fold cross-validation**, closely approximating LOOCV (Leave-One-Out Cross-Validation)
+- This was feasible due to filtering of invalid rows (resulting in 1468 clean observations)
+- LOOCV-style resampling:
+  - Ensured high generalization
+  - Stabilized RMSE and R² at high performance
+- trainControl 
+  - method = cv, number = 1465
+
+## Why increase from 5-fold?
+
+- Method = `lm`, metric = RMSE
+- Initial results used 5-fold CV, but tested `number = 1000` to match LOOCV (leave-one-out-style)
+- Surprisingly, 1000-fold CV yielded a significantly better RMSE (nearly 400 points lower)
+- Possible reason: better variance control and finer validation
+
+
+## Cross-Validated Results
+
+### Key Terms
+
+- **MAE (Mean Absolute Error)**: The average of absolute differences between predicted and actual profit values. Lower MAE indicates more accurate predictions.
+
+- **LOOCV (Leave-One-Out Cross-Validation)**: A validation method where each observation is used once as a validation set, and all others are used for training. With 1468 rows, our use of 1465-fold CV mimics this structure for robust error estimation.
+
+## Cross-Validated Results
+
+### Key Performance Metrics
+
+- Final RMSE: **442.28**
+
+- Final MAE: **442.11**
+
+- Final R²: **1.00 (cross-validated)**, **Adjusted R²: 0.9083**
+
+
+## Potential Red Flags:
+- `caret` issued a warning: "There were missing values in resampled performance measures"
+  - This does **not** indicate missing data in the dataset
+  - Probable result of folds with too little variance or model convergence issues
+  - Final RMSE, R², and MAE remain unaffected
+
+- Note: `R² = 1.00` in some folds does **not** indicate overfitting
+  - Adjusted R² = 0.9083 confirms model is generalizing well
+
+## Coefficient Table (via `broom`)
+
+The table below shows the detailed breakdown of feature coefficients using `broom::tidy()`:
+
+| Term                    | Estimate | Std. Error | t-Statistic | p-value   |
+| ----------------------- | -------- | ---------- | ----------- | ----------|
+| revenue\_per\_component | 4.59     | 0.056      | 81.85       | < 2e-16   |
+| log\_units\_components  | 85.25    | 2.90       | 29.40       | < 2e-16   |
+| log\_units\_sold        | -340.85  | 30.57      | -11.15      | 9.25e-28  |
+
+## Coefficients & Interpretability
+
+- Adjusted R²: **0.9083**; model explains 90.8% of Profit variance
+- Most predictors are statistically significant (p < 0.01)
+- Key findings:
+  - `log_units_sold`, `log_units_components`, and `revenue_per_component` are strong, significant predictors
+  - `true_profit_margin` emerged as a meaningful profitability driver
+
+## Thank You
+
+Questions?
+
